@@ -75,10 +75,3 @@ interface CartItem {
 const POSSystem = () => {
   // ... rest of the code ...
 }
-
-// Simple QR Code component for demo
-const QRCode = () => (
-  // ... QR code component code ...
-);
-
-export default POSSystem;
