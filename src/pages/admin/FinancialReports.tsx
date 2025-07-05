@@ -55,8 +55,8 @@ interface PaymentMethodDistribution {
 
 const FinancialReports = () => {
   const { data: orders = [] } = useOrders();
-  const { transactions: posTransactions, loading: posLoading } = usePOSTransactions(selectedDate);
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentYearMonth());
+  const { transactions: posTransactions, loading: posLoading } = usePOSTransactions(selectedMonth);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancialData[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
