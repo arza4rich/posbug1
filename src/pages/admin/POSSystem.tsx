@@ -74,3 +74,4 @@ interface CartItem {
 
 const POSSystem = () => {
   // ... rest of the code ...
+}
