@@ -802,7 +802,7 @@ const FinancialReports = () => {
                             activeShape={renderActiveShape} 
                             data={paymentMethodDistribution} 
                             cx="50%" 
-                            cy="50%" 
+                            cy="40%" 
                             innerRadius={60} 
                             outerRadius={80} 
                             fill="#8884d8" 

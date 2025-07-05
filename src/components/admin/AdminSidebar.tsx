@@ -96,9 +96,9 @@ const AdminSidebar = () => {
         <div className="flex items-center space-x-3 mb-3">
           <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
             <img 
-              src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
+              src="/logo.jpg" 
               alt="Injapan Food Logo" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <div>

@@ -40,7 +40,7 @@ export const generateInvoicePDF = async (element: HTMLElement | null, invoiceNum
     });
     
     // Add logo to PDF
-    const logoUrl = "https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a";
+    const logoUrl = "/logo.jpg";
     try {
       // Create a temporary image element to load the logo
       const logoImg = new Image();

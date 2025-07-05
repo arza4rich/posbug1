@@ -3,7 +3,7 @@
          <div className="text-center mb-4 receipt-header">
           <div className="w-16 h-16 mx-auto mb-2">
             <img 
-              src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a"
+              src="/logo.jpg"
               alt="Injapan Food Logo" 
               className="w-full h-full object-contain rounded-full"
             />
