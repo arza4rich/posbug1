@@ -745,6 +745,11 @@ const FinancialReports = () => {
                         <YAxis 
                           tickFormatter={(value) => `¥${value.toLocaleString()}`}
                         />
+                        <YAxis 
+                          yAxisId="right"
+                          orientation="right"
+                          tickFormatter={(value) => `${value} orders`}
+                        />
                         <Tooltip 
                           content={<CustomTooltip />}
                           labelFormatter={(label) => `Bulan: ${label}`}
