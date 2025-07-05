@@ -58,11 +58,11 @@ const Invoice = ({ order, invoiceNumber }: InvoiceProps) => {
       {/* Header with Logo and Title */}
       <div className="flex justify-between items-center border-b-2 border-gray-200 pb-4 mb-6 page-break-avoid">
         <div className="flex items-center space-x-4">
-          <div className="w-16 h-16 rounded-lg overflow-hidden">
+          <div className="w-16 h-16 rounded-full overflow-hidden">
             <img 
               src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
               alt="Injapan Food Logo" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <div>

@@ -58,7 +58,7 @@ const PWAInstallPrompt = () => {
           <img 
             src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
             alt="Injapan Food Logo" 
-            className="w-12 h-12 rounded-lg"
+            className="w-12 h-12 rounded-full object-contain"
           />
         </div>
         <div className="flex-1">

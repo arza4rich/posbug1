@@ -182,11 +182,11 @@ const AuthForm = () => {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-lg overflow-hidden mx-auto mb-4">
+          <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-4">
             <img 
               src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
               alt="Injapan Food Logo" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Injapan Food</h2>

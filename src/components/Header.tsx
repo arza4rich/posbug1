@@ -65,17 +65,15 @@ const Header = ({ shouldAnimateCart = false }: HeaderProps) => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div onClick={() => handleNavClick('/')} className="flex items-center space-x-2 cursor-pointer">
-            <div className="w-10 h-10 rounded-lg overflow-hidden">
+          <div onClick={() => handleNavClick('/')} className="flex items-center space-x-3 cursor-pointer">
+            <div className="w-12 h-12 rounded-full overflow-hidden">
               <img 
                 src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
                 alt="Injapan Food Logo" 
                 className="w-full h-full object-cover"
               />
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-primary">Injapan Food</h1>
-            </div>
+            <h1 className="text-xl font-bold text-primary">Injapan Food</h1>
           </div>
 
           {/* Desktop Navigation */}

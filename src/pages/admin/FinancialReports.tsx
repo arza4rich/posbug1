@@ -757,18 +757,13 @@ const FinancialReports = () => {
                         <YAxis 
                           tickFormatter={(value) => `¥${value.toLocaleString()}`}
                         />
-                        <YAxis 
-                          yAxisId="right"
-                          orientation="right"
-                          tickFormatter={(value) => `${value} orders`}
-                        />
                         <Tooltip 
                           content={<CustomTooltip />}
                           labelFormatter={(label) => `Bulan: ${label}`}
                         />
                         <Legend />
                         <Line type="monotone" dataKey="profit" name="Laba Bersih" stroke="#10b981" strokeWidth={2} />
-                        <Line type="monotone" dataKey="orderCount" name="Jumlah Pesanan" stroke="#8884d8" strokeWidth={2} yAxisId="right" />
+                        <Line type="monotone" dataKey="orderCount" name="Jumlah Pesanan" stroke="#8884d8" strokeWidth={2} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -790,34 +785,29 @@ const FinancialReports = () => {
                   <div className="h-80">
                     {isLoading ? (
                       <div className="flex items-center justify-center h-full">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
                       </div>
                     ) : paymentMethodDistribution.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Tooltip content={<CustomTooltip />} />
                           <Legend 
-                            layout="vertical" 
-                            verticalAlign="middle" 
-                            align="right" 
-                            wrapperStyle={{ paddingLeft: "60px", maxWidth: "40%" }}
+                            layout="horizontal" 
+                            verticalAlign="bottom" 
+                            align="center"
+                            wrapperStyle={{ paddingTop: "20px" }}
                           />
                           <Pie 
                             activeIndex={activePaymentMethodIndex} 
                             activeShape={renderActiveShape} 
                             data={paymentMethodDistribution} 
-                            cx="35%" 
+                            cx="50%" 
                             cy="50%" 
                             innerRadius={60} 
                             outerRadius={80} 
                             fill="#8884d8" 
                             dataKey="value" 
-                            label={({ name, percent }) => {
-                              // Truncate long names
-                              const displayName = name.length > 8 ? name.substring(0, 8) + '...' : name;
-                              return `${displayName} (${(percent * 100).toFixed(0)}%)`;
-                            }}
-                            labelLine={false}
+                            label={false}
                             onMouseEnter={(_, index) => setActivePaymentMethodIndex(index)}
                           > 
                             {paymentMethodDistribution.map((entry, index) => ( 
