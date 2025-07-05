@@ -53,17 +53,42 @@ export const useFinancialReports = (yearMonth: string) => {
           ...doc.data()
         } as Order));
         
+        // Fetch POS transactions for the selected month
+        const posTransactionsRef = collection(db, 'pos_transactions');
+        const posQuery = query(
+          posTransactionsRef,
+          where('createdAt', '>=', startDate.toISOString()),
+          where('createdAt', '<=', endDate.toISOString())
+        );
+        
+        const posSnapshot = await getDocs(posQuery);
+        const posTransactions = posSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
         // Calculate financial summary
-        const revenue = orders.reduce((sum, order) => sum + order.total_price, 0);
+        const orderRevenue = orders.reduce((sum, order) => sum + order.total_price, 0);
+        const posRevenue = posTransactions.reduce((sum, tx) => sum + tx.totalAmount, 0);
+        const revenue = orderRevenue + posRevenue;
+        
         const shippingCost = orders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
         const expenses = shippingCost; // For now, only shipping costs are considered as expenses
         const profit = revenue - expenses;
         
         // Calculate payment method distribution
         const paymentMethods: Record<string, number> = {};
+        
+        // Add order payment methods
         orders.forEach(order => {
           const method = order.customer_info?.payment_method || 'Unknown';
           paymentMethods[method] = (paymentMethods[method] || 0) + order.total_price;
+        });
+        
+        // Add POS payment methods
+        posTransactions.forEach(tx => {
+          const method = tx.paymentMethod || 'Unknown';
+          paymentMethods[method] = (paymentMethods[method] || 0) + tx.totalAmount;
         });
         
         // Set summary
@@ -71,7 +96,7 @@ export const useFinancialReports = (yearMonth: string) => {
           revenue,
           expenses,
           profit,
-          orderCount: orders.length,
+          orderCount: orders.length + posTransactions.length,
           shippingCost,
           paymentMethods
         });
@@ -115,8 +140,25 @@ export const useFinancialReports = (yearMonth: string) => {
           ...doc.data()
         } as Order));
         
+        // Fetch POS transactions for this month
+        const posTransactionsRef = collection(db, 'pos_transactions');
+        const posQuery = query(
+          posTransactionsRef,
+          where('createdAt', '>=', new Date(date.getFullYear(), date.getMonth(), 1).toISOString()),
+          where('createdAt', '<=', endDate.toISOString())
+        );
+        
+        const posSnapshot = await getDocs(posQuery);
+        const monthPosTransactions = posSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
         // Calculate revenue and expenses
-        const revenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+        const orderRevenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+        const posRevenue = monthPosTransactions.reduce((sum, tx) => sum + tx.totalAmount, 0);
+        const revenue = orderRevenue + posRevenue;
+        
         const expenses = monthOrders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
         
         monthlyChartData.push({
@@ -124,7 +166,7 @@ export const useFinancialReports = (yearMonth: string) => {
           revenue,
           expenses,
           profit: revenue - expenses,
-          orderCount: monthOrders.length
+          orderCount: monthOrders.length + monthPosTransactions.length
         });
       }
       

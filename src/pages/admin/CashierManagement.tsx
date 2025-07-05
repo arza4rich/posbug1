@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import CashierManagement from '@/components/admin/CashierManagement';
 

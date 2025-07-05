@@ -7,6 +7,7 @@ import RealtimeClock from '@/components/admin/RealtimeClock';
 import CashierSelector from '@/components/admin/CashierSelector';
 import { db } from '@/config/firebase';
 import { toast } from '@/hooks/use-toast';
+import { processPOSTransaction } from '@/services/posService';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -248,7 +249,7 @@ const POSSystem = () => {
     setIsProcessingPayment(true);
     
     try {
-      // Create transaction object
+      // Prepare transaction object
       const transaction = {
         items: cart.map(item => ({
           id: item.id,
@@ -273,23 +274,19 @@ const POSSystem = () => {
         cashierName: selectedCashier.name
       };
       
-      // Save transaction to Firestore
-      const transactionRef = await addDoc(collection(db, 'pos_transactions'), transaction);
-      console.log('Transaction saved with ID:', transactionRef.id);
-      
-      // Update product stock (optional)
-      // This would require a transaction to ensure atomicity
+      // Process transaction, update inventory and financial records
+      const transactionId = await processPOSTransaction(transaction);
       
       // Set current transaction for receipt
       setCurrentTransaction({
         ...transaction,
-        id: transactionRef.id
+        id: transactionId
       });
       
       // Show success message
       toast({
         title: "Transaksi Berhasil",
-        description: "Pembayaran telah diproses dan transaksi disimpan. Struk akan ditampilkan.",
+        description: "Pembayaran telah diproses, stok produk diperbarui, dan transaksi disimpan.",
       });
       
       // Reset state

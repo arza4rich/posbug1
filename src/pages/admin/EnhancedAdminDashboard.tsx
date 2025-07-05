@@ -1,14 +1,31 @@
 import { useAdminStats } from '@/hooks/useAdminStats';
 import { useAdminLogs } from '@/hooks/useAdminLogs';
+import { useInventoryMonitoring } from '@/hooks/useInventoryMonitoring';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import DashboardStatsCards from '@/components/admin/DashboardStatsCards';
+import InventoryAlerts from '@/components/admin/InventoryAlerts';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SeedDataButton from '@/components/admin/SeedDataButton';
+import FinancialSummaryCards from '@/components/admin/FinancialSummaryCards';
 
 const EnhancedAdminDashboard = () => {
   const { data: stats, isLoading: statsLoading } = useAdminStats();
   const { data: logs = [], isLoading: logsLoading } = useAdminLogs();
+  const { lowStockProducts, outOfStockProducts, loading: inventoryLoading } = useInventoryMonitoring(5);
+  
+  // Get current year and month
+  const getCurrentYearMonth = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  };
+  
+  // Format month for display
+  const formatMonth = (monthStr: string) => {
+    const [year, month] = monthStr.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  };
 
   if (statsLoading) {
     return (
@@ -42,6 +59,13 @@ const EnhancedAdminDashboard = () => {
         </div>
 
         <DashboardStatsCards stats={stats} />
+
+        {/* Inventory Alerts */}
+        <InventoryAlerts
+          lowStockProducts={lowStockProducts}
+          outOfStockProducts={outOfStockProducts}
+          loading={inventoryLoading}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* 5 Produk Stok Terendah */}

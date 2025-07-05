@@ -18,8 +18,18 @@ import {
 import { User, UserPlus } from 'lucide-react';
 import { collection, query, where, getDocs, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { Cashier } from './CashierManagement';
 import { toast } from '@/hooks/use-toast';
+
+// Cashier interface
+export interface Cashier {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface CashierSelectorProps {
   selectedCashier: Cashier | null;

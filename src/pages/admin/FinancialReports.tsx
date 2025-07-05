@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { DollarSign, TrendingUp, Download, Calendar, ArrowDown, ArrowUp, FileText, Plus, Truck, ShoppingCart, CreditCard, Filter, RefreshCw, PieChart as PieChartIcon } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useOrders } from '@/hooks/useOrders';
+import { usePOSTransactions } from '@/hooks/usePOSTransactions';
 import { Order } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
@@ -54,6 +55,7 @@ interface PaymentMethodDistribution {
 
 const FinancialReports = () => {
   const { data: orders = [] } = useOrders();
+  const { transactions: posTransactions, loading: posLoading } = usePOSTransactions(selectedDate);
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentYearMonth());
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancialData[]>([]);
@@ -113,20 +115,36 @@ const FinancialReports = () => {
       
       // Fetch orders for the selected month
       const ordersRef = collection(db, 'orders');
-      const q = query(
+      const ordersQuery = query(
         ordersRef,
         where('created_at', '>=', startDate.toISOString()),
         where('created_at', '<=', endDate.toISOString())
       );
       
-      const querySnapshot = await getDocs(q);
-      const monthOrders = querySnapshot.docs.map(doc => ({
+      const ordersSnapshot = await getDocs(ordersQuery);
+      const monthOrders = ordersSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Order));
       
+      // Fetch POS transactions for the selected month
+      const posTransactionsRef = collection(db, 'pos_transactions');
+      const posQuery = query(
+        posTransactionsRef,
+        where('createdAt', '>=', startDate.toISOString()),
+        where('createdAt', '<=', endDate.toISOString())
+      );
+      
+      const posSnapshot = await getDocs(posQuery);
+      const monthPosTransactions = posSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
       // Calculate monthly summary
-      const revenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+      const orderRevenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+      const posRevenue = monthPosTransactions.reduce((sum, tx) => sum + tx.totalAmount, 0);
+      const revenue = orderRevenue + posRevenue;
       const shippingCost = monthOrders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
       const expenses = shippingCost; // For now, only shipping costs are considered as expenses
       const profit = revenue - expenses;
@@ -188,6 +206,16 @@ const FinancialReports = () => {
         description: `Order #${order.id.slice(-8)} - ${order.customer_info.name}`
       }));
       
+      // Generate transactions from POS sales
+      const posTransactions: FinancialTransaction[] = monthPosTransactions.map(tx => ({
+        id: tx.id,
+        date: new Date(tx.createdAt).toISOString().split('T')[0],
+        category: 'sales',
+        type: 'income',
+        amount: tx.totalAmount,
+        description: `POS Sale by ${tx.cashierName || 'Unknown'}`
+      }));
+      
       // Add shipping expenses
       const shippingTransactions: FinancialTransaction[] = monthOrders
         .filter(order => order.shipping_fee && order.shipping_fee > 0)
@@ -201,7 +229,7 @@ const FinancialReports = () => {
         }));
       
       // Combine and sort transactions
-      const allTransactions = [...orderTransactions, ...shippingTransactions].sort((a, b) => 
+      const allTransactions = [...orderTransactions, ...posTransactions, ...shippingTransactions].sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       
@@ -235,20 +263,36 @@ const FinancialReports = () => {
         
         // Fetch orders for this month
         const ordersRef = collection(db, 'orders');
-        const q = query(
+        const ordersQuery = query(
           ordersRef,
           where('created_at', '>=', new Date(date.getFullYear(), date.getMonth(), 1).toISOString()),
           where('created_at', '<=', endDate.toISOString())
         );
         
-        const querySnapshot = await getDocs(q);
-        const monthOrders = querySnapshot.docs.map(doc => ({
+        const ordersSnapshot = await getDocs(ordersQuery);
+        const monthOrders = ordersSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         } as Order));
         
-        // Calculate revenue and expenses
-        const revenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+        // Fetch POS transactions for this month
+        const posTransactionsRef = collection(db, 'pos_transactions');
+        const posQuery = query(
+          posTransactionsRef,
+          where('createdAt', '>=', new Date(date.getFullYear(), date.getMonth(), 1).toISOString()),
+          where('createdAt', '<=', endDate.toISOString())
+        );
+        
+        const posSnapshot = await getDocs(posQuery);
+        const monthPosTransactions = posSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // Calculate revenue and expenses including POS transactions
+        const orderRevenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+        const posRevenue = monthPosTransactions.reduce((sum, tx) => sum + tx.totalAmount, 0);
+        const revenue = orderRevenue + posRevenue;
         const expenses = monthOrders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
         
         monthlyChartData.push({
@@ -256,7 +300,7 @@ const FinancialReports = () => {
           revenue,
           expenses,
           profit: revenue - expenses,
-          orderCount: monthOrders.length
+          orderCount: monthOrders.length + monthPosTransactions.length
         });
       }
       
