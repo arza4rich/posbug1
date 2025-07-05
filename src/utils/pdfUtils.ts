@@ -39,8 +39,40 @@ export const generateInvoicePDF = async (element: HTMLElement | null, invoiceNum
       format: 'a4'
     });
     
+    // Add logo to PDF
+    const logoUrl = "https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a";
+    try {
+      // Create a temporary image element to load the logo
+      const logoImg = new Image();
+      logoImg.crossOrigin = "Anonymous";  // Important for CORS
+      logoImg.src = logoUrl;
+      
+      // Wait for the image to load
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
+      
+      // Create a canvas for the logo
+      const logoCanvas = document.createElement('canvas');
+      logoCanvas.width = logoImg.width;
+      logoCanvas.height = logoImg.height;
+      const logoCtx = logoCanvas.getContext('2d');
+      logoCtx?.drawImage(logoImg, 0, 0);
+      
+      // Add logo to PDF
+      const logoData = logoCanvas.toDataURL('image/png');
+      const logoWidth = 30; // in mm
+      const logoHeight = 30; // in mm
+      const logoX = (pdfWidth - logoWidth) / 2; // Center horizontally
+      pdf.addImage(logoData, 'PNG', logoX, 5, logoWidth, logoHeight);
+    } catch (logoError) {
+      console.warn('Could not add logo to PDF:', logoError);
+      // Continue without logo if there's an error
+    }
+    
     // Add image to PDF, centered and scaled to fit
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, pdfHeight));
+    pdf.addImage(imgData, 'PNG', 0, 40, imgWidth, Math.min(imgHeight, pdfHeight - 40));
     
     // Download the PDF
     pdf.save(`Invoice-${invoiceNumber}.pdf`);

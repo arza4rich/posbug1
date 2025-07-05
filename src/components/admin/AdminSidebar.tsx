@@ -93,8 +93,19 @@ const AdminSidebar = () => {
   return (
     <div className="w-64 bg-white shadow-lg h-screen overflow-y-auto">
       <div className="p-6 border-b">
-        <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
-        <p className="text-sm text-gray-600">Injapan Food</p>
+        <div className="flex items-center space-x-3 mb-3">
+          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+            <img 
+              src="https://firebasestorage.googleapis.com/v0/b/injapan-food.appspot.com/o/logo%2Finjapan-food-logo.png?alt=media&token=022a8dd4-6c9e-4b02-82a8-703a2cbfb51a" 
+              alt="Injapan Food Logo" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
+            <p className="text-sm text-gray-600">Injapan Food</p>
+          </div>
+        </div>
       </div>
       
       <nav className="p-4">
