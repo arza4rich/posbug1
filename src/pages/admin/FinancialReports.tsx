@@ -539,7 +539,7 @@ const FinancialReports = () => {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-blue-700 flex items-center">
                 <DollarSign className="w-4 h-4 mr-2" />
-                Total Omzet
+                Total Omset
               </CardTitle>
             </CardHeader>
             <CardContent>
