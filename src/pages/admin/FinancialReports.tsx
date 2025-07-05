@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, InputProps } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { DollarSign, TrendingUp, Download, Calendar, ArrowDown, ArrowUp, FileText, Plus } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Sector } from 'recharts';
+import { DollarSign, TrendingUp, Download, Calendar, ArrowDown, ArrowUp, FileText, Plus, Truck, ShoppingCart, CreditCard, Filter, RefreshCw, PieChart as PieChartIcon } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useOrders } from '@/hooks/useOrders';
 import { Order } from '@/types';
 import { toast } from '@/hooks/use-toast';
+import { collection, query, where, getDocs, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 // Financial transaction type
 interface FinancialTransaction {
@@ -32,11 +34,33 @@ interface MonthlyFinancialData {
   orderCount: number;
 }
 
+// Monthly summary type
+interface MonthlySummary {
+  month: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+  orderCount: number;
+  shippingCost: number;
+  paymentMethods: Record<string, number>;
+}
+
+// Payment method distribution type
+interface PaymentMethodDistribution {
+  name: string;
+  value: number;
+  color: string;
+}
+
 const FinancialReports = () => {
   const { data: orders = [] } = useOrders();
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentYearMonth());
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancialData[]>([]);
+  const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
+  const [paymentMethodDistribution, setPaymentMethodDistribution] = useState<PaymentMethodDistribution[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activePaymentMethodIndex, setActivePaymentMethodIndex] = useState<number | undefined>(undefined);
   const [newTransaction, setNewTransaction] = useState<Partial<FinancialTransaction>>({
     category: 'expense',
     type: 'expense',
@@ -44,6 +68,10 @@ const FinancialReports = () => {
     description: ''
   });
   const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [dateRange, setDateRange] = useState<{start: Date, end: Date}>({
+    start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    end: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+  });
 
   // Get current year and month in YYYY-MM format
   function getCurrentYearMonth() {
@@ -72,8 +100,163 @@ const FinancialReports = () => {
     return months;
   };
 
+  // Fetch financial data from Firebase
+  const fetchFinancialData = async () => {
+    setIsLoading(true);
+    try {
+      // Parse selected month
+      const [year, month] = selectedMonth.split('-');
+      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+      const endDate = new Date(parseInt(year), parseInt(month), 0); // Last day of month
+      
+      setDateRange({start: startDate, end: endDate});
+      
+      // Fetch orders for the selected month
+      const ordersRef = collection(db, 'orders');
+      const q = query(
+        ordersRef,
+        where('created_at', '>=', startDate.toISOString()),
+        where('created_at', '<=', endDate.toISOString())
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const monthOrders = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Order));
+      
+      // Calculate monthly summary
+      const revenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+      const shippingCost = monthOrders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
+      const expenses = shippingCost; // For now, only shipping costs are considered as expenses
+      const profit = revenue - expenses;
+      
+      // Calculate payment method distribution
+      const paymentMethods: Record<string, number> = {};
+      monthOrders.forEach(order => {
+        const method = order.customer_info?.payment_method || 'Unknown';
+        paymentMethods[method] = (paymentMethods[method] || 0) + order.total_price;
+      });
+      
+      // Transform payment methods for pie chart
+      const paymentMethodColors = {
+        'COD (Cash on Delivery)': '#4ade80', // green
+        'Bank Transfer (Rupiah)': '#3b82f6', // blue
+        'Bank Transfer (Yucho / ゆうちょ銀行)': '#8b5cf6', // purple
+        'QRIS / QR Code': '#f59e0b', // amber
+        'Unknown': '#94a3b8' // slate
+      };
+      
+      const paymentMethodsArray = Object.entries(paymentMethods).map(([name, value]) => ({
+        name,
+        value,
+        color: paymentMethodColors[name as keyof typeof paymentMethodColors] || '#94a3b8'
+      }));
+      
+      setPaymentMethodDistribution(paymentMethodsArray);
+      
+      // Set monthly summary
+      setMonthlySummary({
+        month: formatMonth(selectedMonth),
+        revenue,
+        expenses,
+        profit,
+        orderCount: monthOrders.length,
+        shippingCost,
+        paymentMethods
+      });
+      
+      // Generate transactions from orders
+      const orderTransactions: FinancialTransaction[] = monthOrders.map(order => ({
+        id: order.id,
+        date: new Date(order.created_at).toISOString().split('T')[0],
+        category: 'sales',
+        type: 'income',
+        amount: order.total_price,
+        description: `Order #${order.id.slice(-8)} - ${order.customer_info.name}`
+      }));
+      
+      // Add shipping expenses
+      const shippingTransactions: FinancialTransaction[] = monthOrders
+        .filter(order => order.shipping_fee && order.shipping_fee > 0)
+        .map(order => ({
+          id: `shipping-${order.id}`,
+          date: new Date(order.created_at).toISOString().split('T')[0],
+          category: 'expense',
+          type: 'expense',
+          amount: order.shipping_fee || 0,
+          description: `Shipping for Order #${order.id.slice(-8)}`
+        }));
+      
+      // Combine and sort transactions
+      const allTransactions = [...orderTransactions, ...shippingTransactions].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      
+      setTransactions(allTransactions);
+      
+      // Generate historical data for charts (last 6 months)
+      await generateHistoricalData();
+      
+    } catch (error) {
+      console.error('Error fetching financial data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch financial data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Generate historical data for charts
+  const generateHistoricalData = async () => {
+    try {
+      const monthlyChartData: MonthlyFinancialData[] = [];
+      const [year, month] = selectedMonth.split('-');
+      
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(parseInt(year), parseInt(month) - 1 - i, 1);
+        const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        const monthName = date.toLocaleDateString('ja-JP', { month: 'short' });
+        
+        // Fetch orders for this month
+        const ordersRef = collection(db, 'orders');
+        const q = query(
+          ordersRef,
+          where('created_at', '>=', new Date(date.getFullYear(), date.getMonth(), 1).toISOString()),
+          where('created_at', '<=', endDate.toISOString())
+        );
+        
+        const querySnapshot = await getDocs(q);
+        const monthOrders = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as Order));
+        
+        // Calculate revenue and expenses
+        const revenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
+        const expenses = monthOrders.reduce((sum, order) => sum + (order.shipping_fee || 0), 0);
+        
+        monthlyChartData.push({
+          month: monthName,
+          revenue,
+          expenses,
+          profit: revenue - expenses,
+          orderCount: monthOrders.length
+        });
+      }
+      
+      setMonthlyData(monthlyChartData);
+      
+    } catch (error) {
+      console.error('Error generating historical data:', error);
+    }
+  };
+
   // Format currency as Yen
-  const formatYen = (amount: number) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ja-JP', {
       style: 'currency',
       currency: 'JPY',
@@ -81,93 +264,85 @@ const FinancialReports = () => {
     }).format(amount);
   };
 
-  // Calculate financial data based on orders and selected month
-  useEffect(() => {
-    if (!orders.length) return;
-
-    // Filter orders for the selected month
-    const [year, month] = selectedMonth.split('-');
-    const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-    const endDate = new Date(parseInt(year), parseInt(month), 0); // Last day of month
-    
-    const filteredOrders = orders.filter(order => {
-      const orderDate = new Date(order.created_at);
-      return orderDate >= startDate && orderDate <= endDate && 
-             (order.status === 'completed' || order.status === 'confirmed');
-    });
-
-    // Generate transactions from orders
-    const orderTransactions: FinancialTransaction[] = filteredOrders.map(order => ({
-      id: order.id,
-      date: new Date(order.created_at).toISOString().split('T')[0],
-      category: 'sales',
-      type: 'income',
-      amount: order.total_price,
-      description: `Order #${order.id.slice(-8)} - ${order.customer_info.name}`
-    }));
-
-    // Add some sample expenses for demonstration
-    const sampleExpenses: FinancialTransaction[] = [
-      {
-        id: 'exp-1',
-        date: `${year}-${month}-05`,
-        category: 'expense',
-        type: 'expense',
-        amount: 25000,
-        description: 'Biaya pengiriman bulanan'
-      },
-      {
-        id: 'exp-2',
-        date: `${year}-${month}-12`,
-        category: 'expense',
-        type: 'expense',
-        amount: 15000,
-        description: 'Biaya penyimpanan produk'
-      },
-      {
-        id: 'exp-3',
-        date: `${year}-${month}-18`,
-        category: 'expense',
-        type: 'expense',
-        amount: 8000,
-        description: 'Biaya operasional'
-      }
-    ];
-
-    // Combine and sort transactions by date
-    const allTransactions = [...orderTransactions, ...sampleExpenses].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    
-    setTransactions(allTransactions);
-
-    // Calculate monthly summary
-    const totalRevenue = orderTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = sampleExpenses.reduce((sum, t) => sum + t.amount, 0);
-    
-    // Generate monthly data for charts (last 6 months)
-    const monthlyChartData: MonthlyFinancialData[] = [];
-    
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(parseInt(year), parseInt(month) - 1 - i, 1);
-      const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const monthName = date.toLocaleDateString('ja-JP', { month: 'short' });
-      
-      // Generate some sample data for demonstration
-      const revenue = totalRevenue * (0.7 + Math.random() * 0.6);
-      const expenses = totalExpenses * (0.7 + Math.random() * 0.6);
-      
-      monthlyChartData.push({
-        month: monthName,
-        revenue: Math.round(revenue),
-        expenses: Math.round(expenses),
-        profit: Math.round(revenue - expenses),
-        orderCount: Math.round(filteredOrders.length * (0.7 + Math.random() * 0.6))
-      });
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white p-3 border rounded-md shadow-md">
+          <p className="font-medium text-sm">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {formatCurrency(entry.value)}
+            </p>
+          ))}
+        </div>
+      );
     }
-    
-    setMonthlyData(monthlyChartData);
-  }, [orders, selectedMonth]);
+    return null;
+  };
+
+  // Render active shape for pie chart
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, midAngle, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
+    const RADIAN = Math.PI / 180;
+    const sin = Math.sin(-RADIAN * midAngle);
+    const cos = Math.cos(-RADIAN * midAngle);
+    const sx = cx + (outerRadius + 10) * cos;
+    const sy = cy + (outerRadius + 10) * sin;
+    const mx = cx + (outerRadius + 30) * cos;
+    const my = cy + (outerRadius + 30) * sin;
+    const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+    const ey = my;
+    const textAnchor = cos >= 0 ? 'start' : 'end';
+
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          innerRadius={outerRadius + 6}
+          outerRadius={outerRadius + 10}
+          fill={fill}
+        />
+        <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
+        <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
+        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" fontSize={12}>
+          {payload.name.length > 15 ? payload.name.substring(0, 15) + '...' : payload.name}
+        </text>
+        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" fontSize={12}>
+          {`${(percent * 100).toFixed(2)}%`}
+        </text>
+        <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={36} textAnchor={textAnchor} fill="#333" fontSize={12}>
+          {formatCurrency(value)}
+        </text>
+      </g>
+    );
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('id-ID', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Fetch data when component mounts or selected month changes
+  useEffect(() => {
+    fetchFinancialData();
+  }, [selectedMonth]);
 
   // Calculate summary statistics
   const totalRevenue = transactions
@@ -179,6 +354,12 @@ const FinancialReports = () => {
     .reduce((sum, t) => sum + t.amount, 0);
     
   const netProfit = totalRevenue - totalExpenses;
+
+  // Refresh data
+  const handleRefresh = () => {
+    fetchFinancialData();
+    toast({ title: "Refreshing data", description: "Financial data is being refreshed" });
+  };
 
   // Add new transaction
   const handleAddTransaction = () => {
@@ -255,7 +436,7 @@ const FinancialReports = () => {
     <AdminLayout>
       <div className="p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Laporan Keuangan</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Laporan Keuangan</h1>
           <p className="text-gray-600">Kelola dan pantau data keuangan Injapan Food</p>
         </div>
 
@@ -279,6 +460,7 @@ const FinancialReports = () => {
           </div>
           
           <div className="flex space-x-2">
+            <Button variant="outline" onClick={handleRefresh} disabled={isLoading}><RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} /> Refresh Data</Button>
             <Button 
               variant="outline" 
               onClick={exportToCSV}
@@ -352,7 +534,7 @@ const FinancialReports = () => {
         )}
 
         {/* Financial Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-blue-700 flex items-center">
@@ -361,7 +543,7 @@ const FinancialReports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-700">{formatYen(totalRevenue)}</div>
+              <div className="text-3xl font-bold text-blue-700">{isLoading ? '...' : formatCurrency(totalRevenue)}</div>
               <p className="text-sm text-blue-600 mt-1">
                 Periode {formatMonth(selectedMonth)}
               </p>
@@ -376,7 +558,7 @@ const FinancialReports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-700">{formatYen(netProfit)}</div>
+              <div className="text-3xl font-bold text-green-700">{isLoading ? '...' : formatCurrency(netProfit)}</div>
               <p className="text-sm text-green-600 mt-1">
                 {netProfit > 0 ? (
                   <span className="flex items-center">
@@ -393,6 +575,21 @@ const FinancialReports = () => {
             </CardContent>
           </Card>
           
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-purple-700 flex items-center">
+                <Truck className="w-4 h-4 mr-2" />
+                Biaya Pengiriman
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-purple-700">{isLoading ? '...' : formatCurrency(monthlySummary?.shippingCost || 0)}</div>
+              <p className="text-sm text-purple-600 mt-1">
+                {monthlySummary?.orderCount || 0} pesanan
+              </p>
+            </CardContent>
+          </Card>
+          
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-red-700 flex items-center">
@@ -401,7 +598,7 @@ const FinancialReports = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-red-700">{formatYen(totalExpenses)}</div>
+              <div className="text-3xl font-bold text-red-700">{isLoading ? '...' : formatCurrency(totalExpenses)}</div>
               <p className="text-sm text-red-600 mt-1">
                 Periode {formatMonth(selectedMonth)}
               </p>
@@ -412,15 +609,26 @@ const FinancialReports = () => {
         {/* Tabs for different views */}
         <Tabs defaultValue="transactions" className="mb-8">
           <TabsList className="mb-4">
-            <TabsTrigger value="transactions">Transaksi</TabsTrigger>
-            <TabsTrigger value="charts">Grafik</TabsTrigger>
+            <TabsTrigger value="transactions" className="flex items-center space-x-2">
+              <FileText className="w-4 h-4 mr-2" />
+              Transaksi
+            </TabsTrigger>
+            <TabsTrigger value="charts" className="flex items-center">
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Grafik
+            </TabsTrigger>
+            <TabsTrigger value="payment-methods" className="flex items-center">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Metode Pembayaran
+            </TabsTrigger>
           </TabsList>
           
+          {/* Transactions Tab */}
           <TabsContent value="transactions">
             <Card>
               <CardHeader>
                 <CardTitle>Laporan Transaksi Keuangan</CardTitle>
-              </CardHeader>
+              </CardHeader> 
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
@@ -434,7 +642,7 @@ const FinancialReports = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {transactions.length === 0 ? (
+                      {isLoading ? (
                         <TableRow>
                           <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                             Tidak ada data transaksi untuk periode ini
@@ -442,6 +650,13 @@ const FinancialReports = () => {
                         </TableRow>
                       ) : (
                         <>
+                          {transactions.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                Tidak ada data transaksi untuk periode ini
+                              </TableCell>
+                            </TableRow>
+                          ) : (
                           {transactions.map((transaction) => (
                             <TableRow key={transaction.id}>
                               <TableCell>{new Date(transaction.date).toLocaleDateString('ja-JP')}</TableCell>
@@ -461,7 +676,7 @@ const FinancialReports = () => {
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                                  {formatYen(transaction.amount)}
+                                  {formatCurrency(transaction.amount)}
                                 </span>
                               </TableCell>
                               <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
@@ -471,10 +686,11 @@ const FinancialReports = () => {
                           {/* Summary row */}
                           <TableRow className="bg-gray-50 font-bold">
                             <TableCell colSpan={3} className="text-right">Total:</TableCell>
-                            <TableCell className="text-right">{formatYen(netProfit)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(netProfit)}</TableCell>
                             <TableCell></TableCell>
                           </TableRow>
                         </>
+                          )}
                       )}
                     </TableBody>
                   </Table>
@@ -485,7 +701,7 @@ const FinancialReports = () => {
           
           <TabsContent value="charts">
             <div className="grid grid-cols-1 gap-6">
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Tren Keuangan 6 Bulan Terakhir</CardTitle>
                 </CardHeader>
@@ -493,7 +709,7 @@ const FinancialReports = () => {
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={monthlyData}
+                        data={isLoading ? [] : monthlyData}
                         margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
@@ -502,7 +718,7 @@ const FinancialReports = () => {
                           tickFormatter={(value) => `¥${value.toLocaleString()}`}
                         />
                         <Tooltip 
-                          formatter={(value) => [`¥${Number(value).toLocaleString()}`, '']}
+                          content={<CustomTooltip />}
                           labelFormatter={(label) => `Bulan: ${label}`}
                         />
                         <Legend />
@@ -513,7 +729,7 @@ const FinancialReports = () => {
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> 
               
               <Card>
                 <CardHeader>
@@ -523,7 +739,7 @@ const FinancialReports = () => {
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
-                        data={monthlyData}
+                        data={isLoading ? [] : monthlyData}
                         margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
@@ -532,7 +748,7 @@ const FinancialReports = () => {
                           tickFormatter={(value) => `¥${value.toLocaleString()}`}
                         />
                         <Tooltip 
-                          formatter={(value) => [`¥${Number(value).toLocaleString()}`, '']}
+                          content={<CustomTooltip />}
                           labelFormatter={(label) => `Bulan: ${label}`}
                         />
                         <Legend />
@@ -540,6 +756,49 @@ const FinancialReports = () => {
                         <Line type="monotone" dataKey="orderCount" name="Jumlah Pesanan" stroke="#8884d8" strokeWidth={2} yAxisId="right" />
                       </LineChart>
                     </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="payment-methods">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Distribusi Metode Pembayaran
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                      </div>
+                    ) : paymentMethodDistribution.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            activeIndex={activePaymentMethodIndex}
+                            activeShape={renderActiveShape}
+                            data={paymentMethodDistribution}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                            onMouseEnter={(_, index) => setActivePaymentMethodIndex(index)}
+                          >
+                            {paymentMethodDistribution.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : <div className="flex items-center justify-center h-full text-gray-500">No payment data available</div>}
                   </div>
                 </CardContent>
               </Card>
