@@ -1,10 +1,14 @@
 import { collection, addDoc, updateDoc, doc, runTransaction, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Product, POSTransaction } from '@/types';
+import { toast } from '@/hooks/use-toast';
 
 // Process a POS transaction and update inventory
 export const processPOSTransaction = async (transaction: Omit<POSTransaction, 'id'>) => {
   try {
+    console.log('Processing POS transaction:', transaction);
+    let transactionId = '';
+    
     // Use a transaction to ensure atomicity
     await runTransaction(db, async (firestoreTransaction) => {
       // Update product stock for each item
@@ -32,24 +36,38 @@ export const processPOSTransaction = async (transaction: Omit<POSTransaction, 'i
     });
     
     // Create transaction record
-    const transactionRef = await addDoc(collection(db, 'pos_transactions'), {
-      ...transaction,
-      createdAt: new Date().toISOString()
-    });
+    try {
+      const transactionRef = await addDoc(collection(db, 'pos_transactions'), {
+        ...transaction,
+        createdAt: new Date().toISOString()
+      });
+      
+      transactionId = transactionRef.id;
+      console.log('POS transaction saved with ID:', transactionId);
+      
+      // Create financial transaction record
+      await addDoc(collection(db, 'financial_transactions'), {
+        transactionId: transactionId,
+        date: new Date().toISOString(),
+        category: 'sales',
+        type: 'income',
+        amount: transaction.totalAmount,
+        description: `POS Sale by ${transaction.cashierName}`,
+        paymentMethod: transaction.paymentMethod,
+        createdAt: new Date().toISOString()
+      });
+      
+      console.log('Financial transaction record created');
+    } catch (error) {
+      console.error('Error saving transaction records:', error);
+      toast({
+        title: "Error",
+        description: "Transaction was processed but records may be incomplete",
+        variant: "destructive"
+      });
+    }
     
-    // Create financial transaction record
-    await addDoc(collection(db, 'financial_transactions'), {
-      transactionId: transactionRef.id,
-      date: new Date().toISOString(),
-      category: 'sales',
-      type: 'income',
-      amount: transaction.totalAmount,
-      description: `POS Sale by ${transaction.cashierName}`,
-      paymentMethod: transaction.paymentMethod,
-      createdAt: new Date().toISOString()
-    });
-    
-    return transactionRef.id;
+    return transactionId;
   } catch (error) {
     console.error('Error processing POS transaction:', error);
     throw error;
