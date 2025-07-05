@@ -784,7 +784,12 @@ const FinancialReports = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Tooltip content={<CustomTooltip />} />
-                          <Legend layout="vertical" verticalAlign="middle" align="right" />
+                          <Legend 
+                            layout="vertical" 
+                            verticalAlign="middle" 
+                            align="right" 
+                            wrapperStyle={{ paddingLeft: "30px" }}
+                          />
                           <Pie 
                             activeIndex={activePaymentMethodIndex} 
                             activeShape={renderActiveShape} 
@@ -795,7 +800,11 @@ const FinancialReports = () => {
                             outerRadius={80} 
                             fill="#8884d8" 
                             dataKey="value" 
-                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            label={({ name, percent }) => {
+                              // Truncate long names
+                              const displayName = name.length > 10 ? name.substring(0, 10) + '...' : name;
+                              return `${displayName} (${(percent * 100).toFixed(0)}%)`;
+                            }}
                             labelLine={false}
                             onMouseEnter={(_, index) => setActivePaymentMethodIndex(index)}
                           > 
