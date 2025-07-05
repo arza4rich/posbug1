@@ -58,6 +58,7 @@ const FinancialReports = () => {
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentYearMonth());
   const { transactions: posTransactions, loading: posLoading } = usePOSTransactions(selectedMonth);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [financialTransactions, setFinancialTransactions] = useState<any[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancialData[]>([]);
   const [monthlySummary, setMonthlySummary] = useState<MonthlySummary | null>(null);
   const [paymentMethodDistribution, setPaymentMethodDistribution] = useState<PaymentMethodDistribution[]>([]);
@@ -110,6 +111,7 @@ const FinancialReports = () => {
       const [year, month] = selectedMonth.split('-');
       const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
       const endDate = new Date(parseInt(year), parseInt(month), 0); // Last day of month
+      console.log('Fetching financial data for period:', startDate.toISOString(), 'to', endDate.toISOString());
       
       setDateRange({start: startDate, end: endDate});
       
@@ -131,15 +133,42 @@ const FinancialReports = () => {
       const posTransactionsRef = collection(db, 'pos_transactions');
       const posQuery = query(
         posTransactionsRef,
-        where('createdAt', '>=', startDate.toISOString()),
-        where('createdAt', '<=', endDate.toISOString())
+        where('createdAt', '>=', startDate.toISOString())
       );
       
       const posSnapshot = await getDocs(posQuery);
-      const monthPosTransactions = posSnapshot.docs.map(doc => ({
+      let monthPosTransactions = posSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
+      
+      // Filter by end date in memory to avoid compound query issues
+      monthPosTransactions = monthPosTransactions.filter(tx => 
+        tx.createdAt <= endDate.toISOString()
+      );
+      
+      console.log(`Found ${monthPosTransactions.length} POS transactions`);
+      
+      // Fetch financial transactions
+      const financialTransactionsRef = collection(db, 'financial_transactions');
+      const financialQuery = query(
+        financialTransactionsRef,
+        where('date', '>=', startDate.toISOString())
+      );
+      
+      const financialSnapshot = await getDocs(financialQuery);
+      let financialTxs = financialSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Filter by end date in memory
+      financialTxs = financialTxs.filter(tx => 
+        tx.date <= endDate.toISOString()
+      );
+      
+      console.log(`Found ${financialTxs.length} financial transactions`);
+      setFinancialTransactions(financialTxs);
       
       // Calculate monthly summary
       const orderRevenue = monthOrders.reduce((sum, order) => sum + order.total_price, 0);
@@ -197,7 +226,7 @@ const FinancialReports = () => {
       });
       
       // Generate transactions from orders
-      const orderTransactions: FinancialTransaction[] = monthOrders.map(order => ({
+      let allTransactions: FinancialTransaction[] = monthOrders.map(order => ({
         id: order.id,
         date: new Date(order.created_at).toISOString().split('T')[0],
         category: 'sales',
@@ -207,7 +236,7 @@ const FinancialReports = () => {
       }));
       
       // Generate transactions from POS sales
-      const posTransactions: FinancialTransaction[] = monthPosTransactions.map(tx => ({
+      const posTransactionsData: FinancialTransaction[] = monthPosTransactions.map(tx => ({
         id: tx.id,
         date: new Date(tx.createdAt).toISOString().split('T')[0],
         category: 'sales',
@@ -217,7 +246,7 @@ const FinancialReports = () => {
       }));
       
       // Add shipping expenses
-      const shippingTransactions: FinancialTransaction[] = monthOrders
+      const shippingTransactionsData: FinancialTransaction[] = monthOrders
         .filter(order => order.shipping_fee && order.shipping_fee > 0)
         .map(order => ({
           id: `shipping-${order.id}`,
@@ -228,11 +257,22 @@ const FinancialReports = () => {
           description: `Shipping for Order #${order.id.slice(-8)}`
         }));
       
+      // Add financial transactions
+      const financialTransactionsData: FinancialTransaction[] = financialTxs.map(tx => ({
+        id: tx.id,
+        date: new Date(tx.date).toISOString().split('T')[0],
+        category: tx.category || 'sales',
+        type: tx.type || 'income',
+        amount: tx.amount || 0,
+        description: tx.description || `Transaction ${tx.id.slice(-8)}`
+      }));
+      
       // Combine and sort transactions
-      const allTransactions = [...orderTransactions, ...posTransactions, ...shippingTransactions].sort((a, b) => 
+      allTransactions = [...allTransactions, ...posTransactionsData, ...shippingTransactionsData, ...financialTransactionsData].sort((a, b) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       
+      console.log(`Total transactions: ${allTransactions.length}`);
       setTransactions(allTransactions);
       
       // Generate historical data for charts (last 6 months)
@@ -500,7 +540,7 @@ const FinancialReports = () => {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center space-x-2">
             <Calendar className="w-5 h-5 text-gray-500" />
-            <span className="font-medium">Periode:</span>
+            <span className="font-medium">Periode: {formatMonth(selectedMonth)}</span>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Pilih bulan" />
@@ -686,6 +726,16 @@ const FinancialReports = () => {
                 <CardTitle>Laporan Transaksi Keuangan</CardTitle>
               </CardHeader> 
               <CardContent>
+                {transactions.length > 0 && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-700 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Menampilkan {transactions.length} transaksi untuk periode {formatMonth(selectedMonth)}
+                    </p>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>

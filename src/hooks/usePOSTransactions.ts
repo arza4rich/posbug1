@@ -31,19 +31,21 @@ export const usePOSTransactions = (date?: string) => {
       const q = query(transactionsRef);
       
       console.log('Setting up POS transactions listener');
-
+      
       // First check if collection exists and has documents
       getDocs(q).then(initialSnapshot => {
         if (initialSnapshot.empty) {
           console.log('No POS transactions found in initial check');
           setTransactions([]);
           setLoading(false);
+        } else {
+          console.log(`Found ${initialSnapshot.size} POS transactions in initial check`);
         }
       }).catch(err => {
         console.error('Error in initial POS transactions check:', err);
         // Don't set error here, let the snapshot listener handle it
       });
-      
+
       // Set up real-time listener
       const unsubscribe = onSnapshot(q, (snapshot) => {
         try {
@@ -82,17 +84,21 @@ export const usePOSTransactions = (date?: string) => {
           // Filter by date client-side instead of in the query
           if (date) {
             console.log(`Filtering transactions by date: ${date}`);
-            transactionData = transactionData.filter(t => {
-              if (!t.createdAt) {
-                console.log(`Transaction ${t.id} has no createdAt field`);
-                return false;
-              }
-              
-              const txDate = new Date(t.createdAt);
-              const isInRange = txDate >= new Date(startDateStr) && txDate < new Date(endDateStr);
-              console.log(`Transaction ${t.id} date: ${txDate}, in range: ${isInRange}`);
-              return isInRange;
-            });
+            try {
+              transactionData = transactionData.filter(t => {
+                if (!t.createdAt) {
+                  console.log(`Transaction ${t.id} has no createdAt field`);
+                  return false;
+                }
+                
+                const txDate = new Date(t.createdAt);
+                const isInRange = txDate >= new Date(startDateStr) && txDate < new Date(endDateStr);
+                return isInRange;
+              });
+              console.log(`After filtering: ${transactionData.length} transactions match the date range`);
+            } catch (filterError) {
+              console.error('Error filtering transactions by date:', filterError);
+            }
           }
 
           // Sort manually since we're not using orderBy
@@ -135,7 +141,7 @@ export const usePOSTransactions = (date?: string) => {
 export const getPOSTransactionsByDateRange = async (startDate: Date, endDate: Date) => {
   try {
     const startDateStr = startDate.toISOString();
-    const endDateStr = endDate.toISOString();
+    const endDateStr = new Date(endDate.getTime() + 86400000).toISOString(); // Add one day to include the end date
     
     console.log('Fetching POS transactions from', startDateStr, 'to', endDateStr);
     
@@ -143,26 +149,55 @@ export const getPOSTransactionsByDateRange = async (startDate: Date, endDate: Da
     // Use a simpler query to avoid index requirements
     const q = query(transactionsRef);
     
-    const snapshot = await getDocs(q);
-    const transactions: POSTransaction[] = [];
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      // Filter by date manually
-      if (data.createdAt && data.createdAt >= startDateStr && data.createdAt < endDateStr) {
-        transactions.push({ id: doc.id, ...data } as POSTransaction);
-      }
-    });
-    
-    // Sort manually by date
-    transactions.sort((a, b) => {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    
-    console.log(`Found ${transactions.length} transactions in date range`);
-    return transactions;
+    try {
+      const snapshot = await getDocs(q);
+      const transactions: POSTransaction[] = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        // Filter by date manually
+        if (data.createdAt && data.createdAt >= startDateStr && data.createdAt < endDateStr) {
+          transactions.push({ id: doc.id, ...data } as POSTransaction);
+        }
+      });
+      
+      // Sort manually by date
+      transactions.sort((a, b) => {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      
+      console.log(`Found ${transactions.length} transactions in date range`);
+      return transactions;
+    } catch (error) {
+      console.error('Error fetching POS transactions:', error);
+      return [];
+    }
   } catch (error) {
     console.error('Error fetching POS transactions by date range:', error);
+    throw error;
+  }
+};
+
+// Create a financial transaction record
+export const createFinancialTransaction = async (data: {
+  transactionId: string;
+  date: string;
+  category: string;
+  type: string;
+  amount: number;
+  description: string;
+  paymentMethod?: string;
+}) => {
+  try {
+    const financialTransactionsRef = collection(db, 'financial_transactions');
+    const docRef = await addDoc(financialTransactionsRef, {
+      ...data,
+      createdAt: new Date().toISOString()
+    });
+    
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating financial transaction:', error);
     throw error;
   }
 };
