@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useFirebaseAuth';
 import { useProducts } from '@/hooks/useProducts';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import RealtimeClock from '@/components/admin/RealtimeClock';
 import CashierSelector from '@/components/admin/CashierSelector';
 import { db } from '@/config/firebase';
@@ -12,6 +12,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePOSTransactions } from '@/hooks/usePOSTransactions';
+import DailySalesView from '@/components/admin/DailySalesView';
 
 // UI Components
 import { 
@@ -570,11 +571,15 @@ const POSSystem = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="pos" className="flex items-center">
               <ShoppingCart className="w-4 h-4 mr-2" />
-              Kasir
+              POS Kasir
             </TabsTrigger>
             <TabsTrigger value="transactions" className="flex items-center">
               <Receipt className="w-4 h-4 mr-2" />
               Riwayat Transaksi
+            </TabsTrigger>
+            <TabsTrigger value="daily-sales" className="flex items-center">
+              <DollarSign className="w-4 h-4 mr-2" />
+              Omzet Harian
             </TabsTrigger>
           </TabsList>
 
@@ -888,6 +893,11 @@ const POSSystem = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+          
+          {/* Daily Sales Tab */}
+          <TabsContent value="daily-sales">
+            <DailySalesView />
           </TabsContent>
         </Tabs>
       </div>

@@ -2,6 +2,7 @@ import { collection, addDoc, updateDoc, doc, runTransaction, getDoc } from 'fire
 import { db } from '@/config/firebase';
 import { Product, POSTransaction } from '@/types';
 import { toast } from '@/hooks/use-toast';
+import { updateDailySales } from './dailySalesService';
 
 // Process a POS transaction and update inventory
 export const processPOSTransaction = async (transaction: Omit<POSTransaction, 'id'>) => {
@@ -58,6 +59,12 @@ export const processPOSTransaction = async (transaction: Omit<POSTransaction, 'i
       });
       
       console.log('Financial transaction record created');
+      
+      // Update daily sales record
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      await updateDailySales(today, transaction.totalAmount);
+      console.log('Daily sales record updated');
+      
     } catch (error) {
       console.error('Error saving transaction records:', error);
       toast({
