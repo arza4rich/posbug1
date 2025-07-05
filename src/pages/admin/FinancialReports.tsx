@@ -143,15 +143,27 @@ const FinancialReports = () => {
         'COD (Cash on Delivery)': '#4ade80', // green
         'Bank Transfer (Rupiah)': '#3b82f6', // blue
         'Bank Transfer (Yucho / ゆうちょ銀行)': '#8b5cf6', // purple
+        'Bank Transfer (Yucho)': '#8b5cf6', // purple (shortened version)
         'QRIS / QR Code': '#f59e0b', // amber
         'Unknown': '#94a3b8' // slate
       };
       
-      const paymentMethodsArray = Object.entries(paymentMethods).map(([name, value]) => ({
-        name,
-        value,
-        color: paymentMethodColors[name as keyof typeof paymentMethodColors] || '#94a3b8'
-      }));
+      const paymentMethodsArray = Object.entries(paymentMethods).map(([name, value]) => {
+        // Shorten long payment method names for better display
+        let displayName = name;
+        if (name === 'Bank Transfer (Yucho / ゆうちょ銀行)') {
+          displayName = 'Bank Transfer (Yucho)';
+        }
+        
+        return {
+          name: displayName,
+          originalName: name,
+          value,
+          color: paymentMethodColors[displayName as keyof typeof paymentMethodColors] || 
+                 paymentMethodColors[name as keyof typeof paymentMethodColors] || 
+                 '#94a3b8'
+        };
+      });
       
       setPaymentMethodDistribution(paymentMethodsArray);
       
@@ -289,9 +301,9 @@ const FinancialReports = () => {
     const cos = Math.cos(-RADIAN * midAngle);
     const sx = cx + (outerRadius + 10) * cos;
     const sy = cy + (outerRadius + 10) * sin;
-    const mx = cx + (outerRadius + 30) * cos;
+    const mx = cx + (outerRadius + 25) * cos;
     const my = cy + (outerRadius + 30) * sin;
-    const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+    const ex = mx + (cos >= 0 ? 1 : -1) * 18;
     const ey = my;
     const textAnchor = cos >= 0 ? 'start' : 'end';
 
@@ -318,7 +330,7 @@ const FinancialReports = () => {
         <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
         <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
         <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" fontSize={12}>
-          {payload.name.length > 15 ? payload.name.substring(0, 15) + '...' : payload.name}
+          {payload.name.length > 12 ? payload.name.substring(0, 12) + '...' : payload.name}
         </text>
         <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" fontSize={12}>
           {`${(percent * 100).toFixed(2)}%`}
@@ -788,13 +800,13 @@ const FinancialReports = () => {
                             layout="vertical" 
                             verticalAlign="middle" 
                             align="right" 
-                            wrapperStyle={{ paddingLeft: "30px" }}
+                            wrapperStyle={{ paddingLeft: "60px", maxWidth: "40%" }}
                           />
                           <Pie 
                             activeIndex={activePaymentMethodIndex} 
                             activeShape={renderActiveShape} 
                             data={paymentMethodDistribution} 
-                            cx="40%" 
+                            cx="35%" 
                             cy="50%" 
                             innerRadius={60} 
                             outerRadius={80} 
@@ -802,7 +814,7 @@ const FinancialReports = () => {
                             dataKey="value" 
                             label={({ name, percent }) => {
                               // Truncate long names
-                              const displayName = name.length > 10 ? name.substring(0, 10) + '...' : name;
+                              const displayName = name.length > 8 ? name.substring(0, 8) + '...' : name;
                               return `${displayName} (${(percent * 100).toFixed(0)}%)`;
                             }}
                             labelLine={false}
@@ -848,7 +860,9 @@ const FinancialReports = () => {
                               <TableCell>
                                 <div className="flex items-center">
                                   <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: method.color }}></div>
-                                  {method.name}
+                                  <span className="truncate max-w-[200px]" title={method.originalName || method.name}>
+                                    {method.name}
+                                  </span>
                                 </div>
                               </TableCell>
                               <TableCell className="text-right font-medium">{formatCurrency(method.value)}</TableCell>
