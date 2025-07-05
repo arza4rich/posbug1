@@ -648,15 +648,14 @@ const FinancialReports = () => {
                             Tidak ada data transaksi untuk periode ini
                           </TableCell>
                         </TableRow>
+                      ) : transactions.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                            Tidak ada data transaksi untuk periode ini
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         <>
-                          {transactions.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                                Tidak ada data transaksi untuk periode ini
-                              </TableCell>
-                            </TableRow>
-                          ) : (
                           {transactions.map((transaction) => (
                             <TableRow key={transaction.id}>
                               <TableCell>{new Date(transaction.date).toLocaleDateString('ja-JP')}</TableCell>
@@ -690,7 +689,6 @@ const FinancialReports = () => {
                             <TableCell></TableCell>
                           </TableRow>
                         </>
-                          )}
                       )}
                     </TableBody>
                   </Table>
