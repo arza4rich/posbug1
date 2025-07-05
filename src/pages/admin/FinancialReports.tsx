@@ -766,7 +766,7 @@ const FinancialReports = () => {
           </TabsContent>
           
           <TabsContent value="payment-methods">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
@@ -783,26 +783,79 @@ const FinancialReports = () => {
                     ) : paymentMethodDistribution.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie
-                            activeIndex={activePaymentMethodIndex}
-                            activeShape={renderActiveShape}
-                            data={paymentMethodDistribution}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend layout="vertical" verticalAlign="middle" align="right" />
+                          <Pie 
+                            activeIndex={activePaymentMethodIndex} 
+                            activeShape={renderActiveShape} 
+                            data={paymentMethodDistribution} 
+                            cx="40%" 
+                            cy="50%" 
+                            innerRadius={60} 
+                            outerRadius={80} 
+                            fill="#8884d8" 
+                            dataKey="value" 
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            labelLine={false}
                             onMouseEnter={(_, index) => setActivePaymentMethodIndex(index)}
-                          >
-                            {paymentMethodDistribution.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
+                          > 
+                            {paymentMethodDistribution.map((entry, index) => ( 
+                              <Cell key={`cell-${index}`} fill={entry.color} /> 
+                            ))} 
+                          </Pie> 
                         </PieChart>
                       </ResponsiveContainer>
                     ) : <div className="flex items-center justify-center h-full text-gray-500">No payment data available</div>}
                   </div>
+                </CardContent>
+              </Card>
+              
+              {/* Payment Methods Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Detail Metode Pembayaran
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-40">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    </div>
+                  ) : paymentMethodDistribution.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Metode Pembayaran</TableHead>
+                            <TableHead className="text-right">Jumlah</TableHead>
+                            <TableHead className="text-right">Persentase</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paymentMethodDistribution.map((method) => (
+                            <TableRow key={method.name}>
+                              <TableCell>
+                                <div className="flex items-center">
+                                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: method.color }}></div>
+                                  {method.name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(method.value)}</TableCell>
+                              <TableCell className="text-right">
+                                {((method.value / totalRevenue) * 100).toFixed(1)}%
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-40 text-gray-500">
+                      Tidak ada data metode pembayaran
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
