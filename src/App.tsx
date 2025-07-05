@@ -34,6 +34,7 @@ import ShippingRates from '@/pages/admin/ShippingRates';
 import AffiliateManagement from '@/pages/admin/AffiliateManagement';
 import FinancialReports from '@/pages/admin/FinancialReports';
 import POSSystem from '@/pages/admin/POSSystem';
+import CashierManagement from '@/pages/admin/CashierManagement';
 
 import './App.css';
 import { useEffect } from 'react';
@@ -96,6 +97,7 @@ function App() {
               <Route path="/admin/affiliate" element={<AffiliateManagement />} />
               <Route path="/admin/financial-reports" element={<FinancialReports />} />
               <Route path="/admin/pos" element={<POSSystem />} />
+              <Route path="/admin/cashiers" element={<CashierManagement />} />
               
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />

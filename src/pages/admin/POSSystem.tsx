@@ -4,6 +4,9 @@ import { useAuth } from '@/hooks/useFirebaseAuth';
 import { useProducts } from '@/hooks/useProducts';
 import { collection, addDoc } from 'firebase/firestore';
 import RealtimeClock from '@/components/admin/RealtimeClock';
+import CashierSelector from '@/components/admin/CashierSelector';
+import { Cashier } from '@/components/admin/CashierManagement';
+import RealtimeClock from '@/components/admin/RealtimeClock';
 import { db } from '@/config/firebase';
 import { toast } from '@/hooks/use-toast';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -85,6 +88,7 @@ const POSSystem = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentTransaction, setCurrentTransaction] = useState<any>(null);
   const [isReceiptDialogOpen, setIsReceiptDialogOpen] = useState(false); 
+  const [selectedCashier, setSelectedCashier] = useState<Cashier | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   
   // Get transactions for the selected date
@@ -211,8 +215,8 @@ const POSSystem = () => {
         change: paymentMethod === 'cash' ? changeAmount : undefined,
         status: 'completed',
         createdAt: new Date().toISOString(),
-        cashierId: user?.uid || 'unknown',
-        cashierName: user?.displayName || user?.email || 'Unknown Cashier'
+        cashierId: selectedCashier?.id || user?.uid || 'unknown',
+        cashierName: selectedCashier?.name || user?.displayName || user?.email || 'Unknown Cashier'
       };
       
       // Save transaction to Firestore
@@ -497,11 +501,22 @@ const POSSystem = () => {
       <div className="p-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">POS Kasir</h1>
-            <p className="text-gray-600">Point of Sale untuk transaksi langsung</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">POS Kasir</h1>
+            <p className="text-gray-600 mb-2">Point of Sale untuk transaksi langsung</p>
+            {selectedCashier && (
+              <div className="flex items-center text-sm text-primary font-medium">
+                <span>Kasir: {selectedCashier.name}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-4">
-            <RealtimeClock showIcon={true} showDate={true} showSeconds={true} />
+            <div className="flex flex-col items-end space-y-2">
+              <RealtimeClock showIcon={true} showDate={true} showSeconds={true} />
+              <CashierSelector 
+                selectedCashier={selectedCashier} 
+                onSelectCashier={setSelectedCashier} 
+              Kasir: {currentTransaction.cashierName}
+            </div>
           </div>
         </div>
 
